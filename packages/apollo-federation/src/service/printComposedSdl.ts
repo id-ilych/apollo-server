@@ -29,6 +29,8 @@ import {
   ASTNode,
 } from 'graphql';
 import { Maybe } from '../composition';
+import { isFederationType } from '../types';
+import { isFederationDirective } from '../composition/utils';
 
 type Options = {
   /**
@@ -52,7 +54,10 @@ type Options = {
 export function printComposedSdl(schema: GraphQLSchema, options?: Options): string {
   return printFilteredSchema(
     schema,
-    (n) => !isSpecifiedDirective(n),
+    // Federation change: treat the directives defined by the federation spec
+    // similarly to the directives defined by the GraphQL spec (ie, don't print
+    // their definitions).
+    (n) => !isSpecifiedDirective(n) && !isFederationDirective(n),
     isDefinedType,
     options,
   );
@@ -70,8 +75,15 @@ export function printIntrospectionSchema(
   );
 }
 
+// Federation change: treat the types defined by the federation spec
+// similarly to the directives defined by the GraphQL spec (ie, don't print
+// their definitions).
 function isDefinedType(type: GraphQLNamedType): boolean {
-  return !isSpecifiedScalarType(type) && !isIntrospectionType(type);
+  return (
+    !isSpecifiedScalarType(type) &&
+    !isIntrospectionType(type) &&
+    !isFederationType(type)
+  );
 }
 
 function printFilteredSchema(
@@ -198,12 +210,13 @@ function printObject(type: GraphQLObjectType, options?: Options): string {
     printDescription(options, type) +
     `type ${type.name}` +
     printImplementedInterfaces(type) +
-    // Federation addition for @key
+    // Federation addition for printing @key usages
     printKeyDirectives(type) +
     printFields(options, type)
   );
 }
 
+// Federation change: print usages of the @key directive.
 function printKeyDirectives(type: GraphQLObjectType): string {
   const metadata = type.extensions?.federation;
   if (!metadata) return '';
@@ -211,8 +224,8 @@ function printKeyDirectives(type: GraphQLObjectType): string {
   const { serviceName, keys } = metadata;
   if (!keys) return '';
 
-  return keys[serviceName].map(
-    (key: FieldDefinitionNode[]) => ` @key(fields: "${key.map(print)}")`,
+  return " " + keys[serviceName].map(
+    (key: FieldDefinitionNode[]) => `@key(fields: "${key.map(print)}")`,
   ).join(" ");
 }
 
