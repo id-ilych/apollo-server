@@ -145,11 +145,11 @@ function printSchemaDefinition(
 }
 
 function printGraphDirectives(serviceList: ServiceDefinition[]) {
-  return serviceList.map(service => `\n\t@graph(name: "${service.name}", url: "${service.url}")`).join("")
+  return serviceList.map(service => `\n  @graph(name: "${service.name}", url: "${service.url}")`).join("")
 }
 
 function printComposedGraphDirective() {
-  return `\n\t@composedGraph(version: 1)`;
+  return `\n  @composedGraph(version: 1)`;
 }
 
 /**

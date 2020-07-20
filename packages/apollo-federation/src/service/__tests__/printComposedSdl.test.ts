@@ -10,13 +10,13 @@ describe('printComposedSdl', () => {
   it('prints a full, composed schema', () => {
     expect(printComposedSdl(sorted, fixtures)).toMatchInlineSnapshot(`
       "schema
-      	@graph(name: \\"accounts\\", url: \\"https://api.accounts.com\\")
-      	@graph(name: \\"books\\", url: \\"https://api.books.com\\")
-      	@graph(name: \\"documents\\", url: \\"https://api.documents.com\\")
-      	@graph(name: \\"inventory\\", url: \\"https://api.inventory.com\\")
-      	@graph(name: \\"product\\", url: \\"https://api.product.com\\")
-      	@graph(name: \\"reviews\\", url: \\"https://api.reviews.com\\")
-      	@composedGraph(version: 1)
+        @graph(name: \\"accounts\\", url: \\"https://api.accounts.com\\")
+        @graph(name: \\"books\\", url: \\"https://api.books.com\\")
+        @graph(name: \\"documents\\", url: \\"https://api.documents.com\\")
+        @graph(name: \\"inventory\\", url: \\"https://api.inventory.com\\")
+        @graph(name: \\"product\\", url: \\"https://api.product.com\\")
+        @graph(name: \\"reviews\\", url: \\"https://api.reviews.com\\")
+        @composedGraph(version: 1)
       {
         query: Query
         mutation: Mutation
