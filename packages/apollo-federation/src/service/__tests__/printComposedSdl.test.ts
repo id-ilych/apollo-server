@@ -1,7 +1,6 @@
 import { fixtures } from '../../../../apollo-gateway/src/__tests__/__fixtures__/schemas';
 import { composeServices } from '../../composition';
 import { printComposedSdl } from '../printComposedSdl';
-import { printSchema as printFederatedSchema } from '../printFederatedSchema';
 import { lexicographicSortSchema } from 'graphql';
 
 describe('printComposedSdl', () => {
@@ -204,9 +203,5 @@ describe('printComposedSdl', () => {
       }
       "
     `);
-  });
-
-  it('maintains parity with existing printFederatedSchema', () => {
-    expect(printComposedSdl(sorted)).toEqual(printFederatedSchema(sorted));
   });
 });
