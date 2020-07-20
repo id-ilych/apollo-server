@@ -1,7 +1,9 @@
 import gql from 'graphql-tag';
 import { GraphQLResolverMap } from 'apollo-graphql';
 
+
 export const name = 'books';
+export const url = 'https://api.books.com';
 export const typeDefs = gql`
   directive @stream on FIELD
   directive @transform(from: String!) on FIELD

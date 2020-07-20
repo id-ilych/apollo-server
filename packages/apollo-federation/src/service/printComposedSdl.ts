@@ -28,7 +28,7 @@ import {
   FieldDefinitionNode,
   ASTNode,
 } from 'graphql';
-import { Maybe } from '../composition';
+import { Maybe, ServiceDefinition } from '../composition';
 import { isFederationType } from '../types';
 import { isFederationDirective } from '../composition/utils';
 
@@ -51,9 +51,15 @@ type Options = {
  *        Provide true to use preceding comments as the description.
  *
  */
-export function printComposedSdl(schema: GraphQLSchema, options?: Options): string {
+export function printComposedSdl(
+  schema: GraphQLSchema,
+  serviceList: ServiceDefinition[],
+  options?: Options,
+): string {
   return printFilteredSchema(
     schema,
+    // Federation change: we need service and url information for the @graph directives
+    serviceList,
     // Federation change: treat the directives defined by the federation spec
     // similarly to the directives defined by the GraphQL spec (ie, don't print
     // their definitions).
@@ -88,6 +94,8 @@ function isDefinedType(type: GraphQLNamedType): boolean {
 
 function printFilteredSchema(
   schema: GraphQLSchema,
+  // Federation change: we need service and url information for the @graph directives
+  serviceList: ServiceDefinition[],
   directiveFilter: (type: GraphQLDirective) => boolean,
   typeFilter: (type: GraphQLNamedType) => boolean,
   options?: Options,
@@ -96,7 +104,7 @@ function printFilteredSchema(
   const types = Object.values(schema.getTypeMap()).filter(typeFilter);
 
   return (
-    [printSchemaDefinition(schema)]
+    [printSchemaDefinition(schema, serviceList)]
       .concat(
         directives.map((directive) => printDirective(directive, options)),
         types.map((type) => printType(type, options)),
@@ -106,11 +114,10 @@ function printFilteredSchema(
   );
 }
 
-function printSchemaDefinition(schema: GraphQLSchema): string | undefined {
-  if (schema.description == null && isSchemaOfCommonNames(schema)) {
-    return;
-  }
-
+function printSchemaDefinition(
+  schema: GraphQLSchema,
+  serviceList: ServiceDefinition[],
+): string | undefined {
   const operationTypes = [];
 
   const queryType = schema.getQueryType();
@@ -129,8 +136,20 @@ function printSchemaDefinition(schema: GraphQLSchema): string | undefined {
   }
 
   return (
-    printDescription({}, schema) + `schema {\n${operationTypes.join('\n')}\n}`
+    printDescription({}, schema) +
+    'schema' +
+    printGraphDirectives(serviceList) +
+    printComposedGraphDirective() +
+    `\n{\n${operationTypes.join('\n')}\n}`
   );
+}
+
+function printGraphDirectives(serviceList: ServiceDefinition[]) {
+  return serviceList.map(service => `\n\t@graph(name: "${service.name}", url: "${service.url}")`).join("")
+}
+
+function printComposedGraphDirective() {
+  return `\n\t@composedGraph(version: 1)`;
 }
 
 /**

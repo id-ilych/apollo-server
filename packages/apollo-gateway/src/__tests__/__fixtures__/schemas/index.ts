@@ -4,6 +4,7 @@ import * as documents from './documents';
 import * as inventory from './inventory';
 import * as product from './product';
 import * as reviews from './reviews';
+import { ServiceDefinition } from '@apollo/federation';
 
 export {
   accounts,
@@ -14,7 +15,7 @@ export {
   reviews,
 };
 
-export const fixtures = [
+export const fixtures: ServiceDefinition[] = [
   accounts,
   books,
   documents,

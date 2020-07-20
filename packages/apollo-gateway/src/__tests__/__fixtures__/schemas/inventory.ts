@@ -2,6 +2,7 @@ import gql from 'graphql-tag';
 import { GraphQLResolverMap } from 'apollo-graphql';
 
 export const name = 'inventory';
+export const url = 'https://api.inventory.com';
 export const typeDefs = gql`
   directive @stream on FIELD
   directive @transform(from: String!) on FIELD
