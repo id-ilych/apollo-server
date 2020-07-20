@@ -53,7 +53,7 @@ describe('printComposedSdl', () => {
         message: String
       }
 
-      type Furniture implements Product @key(fields: \\"upc\\")  @key(fields: \\"sku\\") {
+      type Furniture implements Product @key(fields: \\"upc\\") @key(fields: \\"sku\\") {
         brand: Brand
         details: ProductDetailsFurniture
         inStock: Boolean
