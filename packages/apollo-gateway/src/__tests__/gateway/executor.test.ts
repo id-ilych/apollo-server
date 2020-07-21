@@ -1,7 +1,9 @@
 import gql from 'graphql-tag';
 import { ApolloGateway } from '../../';
-import { fixtures } from '../__fixtures__/schemas/';
+import { __testing__ } from '@apollo/federation';
 import { ApolloServer } from "apollo-server";
+
+const { fixtures } = __testing__;
 
 describe('ApolloGateway executor', () => {
   it('validates requests prior to execution', async () => {

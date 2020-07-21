@@ -1,10 +1,11 @@
 import { execute } from '../execution-utils';
-import { reviews, accounts } from '../__fixtures__/schemas/';
-
 import { astSerializer, queryPlanSerializer } from '../../snapshotSerializers';
+import { __testing__ } from '@apollo/federation';
 
 expect.addSnapshotSerializer(astSerializer);
 expect.addSnapshotSerializer(queryPlanSerializer);
+
+const { reviews, accounts } = __testing__;
 
 function spyOnResolver<T extends string>(resolverMap: any, resolverName: T) {
   return jest.spyOn<any, T>(resolverMap, resolverName).mockName(resolverName);

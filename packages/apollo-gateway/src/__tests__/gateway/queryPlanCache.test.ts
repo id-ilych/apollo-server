@@ -1,12 +1,12 @@
 import gql from 'graphql-tag';
 import { createTestClient } from 'apollo-server-testing';
 import { ApolloServerBase as ApolloServer } from 'apollo-server-core';
-import { buildFederatedSchema } from '@apollo/federation';
+import { buildFederatedSchema, __testing__ } from '@apollo/federation';
 
 import { LocalGraphQLDataSource } from '../../datasources/LocalGraphQLDataSource';
 import { ApolloGateway } from '../../';
 
-import { fixtures } from '../__fixtures__/schemas/';
+const { fixtures } = __testing__;
 
 it('caches the query plan for a request', async () => {
   const planner = require('../../buildQueryPlan');

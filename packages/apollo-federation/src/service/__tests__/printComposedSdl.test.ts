@@ -1,8 +1,10 @@
 import { lexicographicSortSchema } from 'graphql';
 import gql from 'graphql-tag';
-import { fixtures } from '../../../../apollo-gateway/src/__tests__/__fixtures__/schemas';
+import { __testing__ } from 'apollo-gateway';
 import { composeAndValidate, ServiceDefinition } from '../../composition';
 import { printComposedSdl } from '../printComposedSdl';
+
+const { fixtures } = __testing__;
 
 describe('printComposedSdl', () => {
   it('prints a full, composed schema', () => {

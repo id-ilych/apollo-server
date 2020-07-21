@@ -5,14 +5,16 @@ import {
   Experimental_DidResolveQueryPlanCallback,
   Experimental_UpdateServiceDefinitions,
 } from '../../index';
-import {
+import { __testing__ } from '@apollo/federation';
+
+const {
   product,
   reviews,
   inventory,
   accounts,
   books,
   documents,
-} from '../__fixtures__/schemas/';
+} = __testing__;
 
 // The order of this was specified to preserve existing test coverage. Typically
 // we would just import and use the `fixtures` array.

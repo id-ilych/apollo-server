@@ -1,9 +1,9 @@
 import gql from 'graphql-tag';
 import { execute } from '../execution-utils';
-
-import { fixtures } from '../__fixtures__/schemas/';
-
 import { astSerializer, queryPlanSerializer } from '../../snapshotSerializers';
+import { __testing__ } from '@apollo/federation';
+
+const { fixtures } = __testing__;
 
 expect.addSnapshotSerializer(astSerializer);
 expect.addSnapshotSerializer(queryPlanSerializer);

@@ -1,5 +1,4 @@
 import { GraphQLSchema, GraphQLError, getIntrospectionQuery } from 'graphql';
-import path from 'path';
 import {
   GraphQLSchemaValidationError,
   GraphQLSchemaModule,
@@ -13,6 +12,7 @@ import {
   composeServices,
   buildFederatedSchema,
   normalizeTypeDefs,
+  __testing__,
 } from '@apollo/federation';
 
 import { buildQueryPlan, buildOperationContext } from '../buildQueryPlan';
@@ -20,7 +20,8 @@ import { executeQueryPlan } from '../executeQueryPlan';
 import { LocalGraphQLDataSource } from '../datasources/LocalGraphQLDataSource';
 
 import { astSerializer, queryPlanSerializer } from '../snapshotSerializers';
-import { fixtureNames } from './__fixtures__/schemas';
+
+const { fixtures } = __testing__;
 
 expect.addSnapshotSerializer(astSerializer);
 expect.addSnapshotSerializer(queryPlanSerializer);
@@ -46,14 +47,7 @@ describe('executeQueryPlan', () => {
 
   beforeEach(() => {
     serviceMap = Object.fromEntries(
-      fixtureNames.map((serviceName) => {
-        return [
-          serviceName,
-          buildLocalService([
-            require(path.join(__dirname, '__fixtures__/schemas', serviceName)),
-          ]),
-        ] as [string, LocalGraphQLDataSource];
-      }),
+      fixtures.map((fixture) => [fixture.name, buildLocalService([fixture])]),
     );
 
     let errors: GraphQLError[];

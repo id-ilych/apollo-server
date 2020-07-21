@@ -9,13 +9,15 @@ import {
   composeServices,
   buildFederatedSchema,
   normalizeTypeDefs,
+  __testing__,
 } from '@apollo/federation';
 
 import { buildQueryPlan, buildOperationContext } from '../buildQueryPlan';
 
 import { LocalGraphQLDataSource } from '../datasources/LocalGraphQLDataSource';
 import { astSerializer, queryPlanSerializer } from '../snapshotSerializers';
-import { fixtureNames } from './__fixtures__/schemas';
+
+const { fixtures } = __testing__;
 
 expect.addSnapshotSerializer(astSerializer);
 expect.addSnapshotSerializer(queryPlanSerializer);
@@ -28,16 +30,11 @@ function buildLocalService(modules: GraphQLSchemaModule[]) {
 describe('buildQueryPlan', () => {
   let schema: GraphQLSchema;
 
+
+
   beforeEach(() => {
     const serviceMap = Object.fromEntries(
-      fixtureNames.map((serviceName) => {
-        return [
-          serviceName,
-          buildLocalService([
-            require(path.join(__dirname, '__fixtures__/schemas', serviceName)),
-          ]),
-        ] as [string, LocalGraphQLDataSource];
-      }),
+      fixtures.map((fixture) => [fixture.name, buildLocalService([fixture])]),
     );
 
     let errors: GraphQLError[];

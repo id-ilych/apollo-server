@@ -9,6 +9,7 @@ import {
   composeAndValidate,
   buildFederatedSchema,
   ServiceDefinition,
+  __testing__,
 } from '@apollo/federation';
 
 import {
@@ -23,8 +24,9 @@ import { mergeDeep } from 'apollo-utilities';
 import queryPlanSerializer from '../snapshotSerializers/queryPlanSerializer';
 import astSerializer from '../snapshotSerializers/astSerializer';
 import gql from 'graphql-tag';
-import { fixtures } from './__fixtures__/schemas';
 const prettyFormat = require('pretty-format');
+
+const { fixtures } = __testing__;
 
 export type ServiceDefinitionModule = ServiceDefinition & GraphQLSchemaModule;
 

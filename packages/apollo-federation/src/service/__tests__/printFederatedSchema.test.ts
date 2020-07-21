@@ -1,4 +1,4 @@
-import { fixtures } from '../../../../apollo-gateway/src/__tests__/__fixtures__/schemas';
+import { fixtures } from '../../fixtures/schemas';
 import { composeServices } from '../../composition';
 import { printSchema } from '../printFederatedSchema';
 import { lexicographicSortSchema } from 'graphql';

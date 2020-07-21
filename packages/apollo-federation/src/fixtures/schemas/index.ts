@@ -4,7 +4,7 @@ import * as documents from './documents';
 import * as inventory from './inventory';
 import * as product from './product';
 import * as reviews from './reviews';
-import { ServiceDefinition } from '@apollo/federation';
+import { ServiceDefinition } from '../../';
 
 export {
   accounts,

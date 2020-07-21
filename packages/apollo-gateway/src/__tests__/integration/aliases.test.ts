@@ -1,13 +1,13 @@
 import { execute } from '../execution-utils';
 
-import { fixtures } from '../__fixtures__/schemas/';
-
 // FIXME: remove this when GraphQLExtensions is removed
 import { createTestClient } from 'apollo-server-testing';
 import { ApolloServerBase as ApolloServer } from 'apollo-server-core';
-import { buildFederatedSchema } from '@apollo/federation';
+import { buildFederatedSchema, __testing__ } from '@apollo/federation';
 import { LocalGraphQLDataSource } from '../../datasources/LocalGraphQLDataSource';
 import { ApolloGateway } from '../../';
+
+const { fixtures } = __testing__;
 
 it('supports simple aliases', async () => {
   const query = `#graphql

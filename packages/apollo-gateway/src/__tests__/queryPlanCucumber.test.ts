@@ -6,13 +6,19 @@ import {
 } from 'apollo-graphql';
 import { defineFeature, loadFeature } from 'jest-cucumber';
 import { DocumentNode, GraphQLSchema, GraphQLError, Kind } from 'graphql';
-import { composeServices, buildFederatedSchema, normalizeTypeDefs, ServiceDefinition } from '@apollo/federation';
+import {
+  composeServices,
+  buildFederatedSchema,
+  normalizeTypeDefs,
+  ServiceDefinition,
+  __testing__,
+} from '@apollo/federation';
 
 import { QueryPlan } from '../..';
 import { LocalGraphQLDataSource } from '../datasources/LocalGraphQLDataSource';
 import { buildQueryPlan, buildOperationContext, BuildQueryPlanOptions } from '../buildQueryPlan';
 
-import { fixtureNames } from '../__tests__/__fixtures__/schemas';
+const { fixtures } = __testing__;
 
 const buildQueryPlanFeature = loadFeature(
   './packages/apollo-gateway/src/__tests__/build-query-plan.feature'
@@ -38,12 +44,11 @@ features.forEach((feature) => {
         let queryPlan: QueryPlan;
         let options: BuildQueryPlanOptions = { autoFragmentization: false };
 
-        const services: ServiceDefinition[] = fixtureNames.map(name => ({
-          name,
-          typeDefs: normalizeTypeDefs(buildLocalService([
-            require(path.join(__dirname, '__fixtures__/schemas', name))
-          ]).sdl())
+        const services: ServiceDefinition[] = fixtures.map((fixture) => ({
+          name: fixture.name,
+          typeDefs: normalizeTypeDefs(buildLocalService([fixture]).sdl()),
         }));
+
         ({ schema, errors} = composeServices(services));
 
         if (errors && errors.length > 0) {
