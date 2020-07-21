@@ -75,6 +75,7 @@ export function printIntrospectionSchema(
 ): string {
   return printFilteredSchema(
     schema,
+    [],
     isSpecifiedDirective,
     isIntrospectionType,
     options,
@@ -152,37 +153,6 @@ function printComposedGraphDirective() {
   return `\n  @composedGraph(version: 1)`;
 }
 
-/**
- * GraphQL schema define root types for each type of operation. These types are
- * the same as any other type and can be named in any manner, however there is
- * a common naming convention:
- *
- *   schema {
- *     query: Query
- *     mutation: Mutation
- *   }
- *
- * When using this naming convention, the schema description can be omitted.
- */
-function isSchemaOfCommonNames(schema: GraphQLSchema): boolean {
-  const queryType = schema.getQueryType();
-  if (queryType && queryType.name !== 'Query') {
-    return false;
-  }
-
-  const mutationType = schema.getMutationType();
-  if (mutationType && mutationType.name !== 'Mutation') {
-    return false;
-  }
-
-  const subscriptionType = schema.getSubscriptionType();
-  if (subscriptionType && subscriptionType.name !== 'Subscription') {
-    return false;
-  }
-
-  return true;
-}
-
 export function printType(type: GraphQLNamedType, options?: Options): string {
   if (isScalarType(type)) {
     return printScalar(type, options);
@@ -229,23 +199,23 @@ function printObject(type: GraphQLObjectType, options?: Options): string {
     printDescription(options, type) +
     `type ${type.name}` +
     printImplementedInterfaces(type) +
-    // Federation addition for printing @key usages
-    printKeyDirectives(type) +
+    // Federation addition for printing @owner and @key usages
+    printEntityDirectives(type) +
     printFields(options, type)
   );
 }
 
-// Federation change: print usages of the @key directive.
-function printKeyDirectives(type: GraphQLObjectType): string {
+// Federation change: print usages of the @owner and @key directives.
+function printEntityDirectives(type: GraphQLObjectType): string {
   const metadata = type.extensions?.federation;
   if (!metadata) return '';
 
   const { serviceName, keys } = metadata;
   if (!keys) return '';
 
-  return " " + keys[serviceName].map(
-    (key: FieldDefinitionNode[]) => `@key(fields: "${key.map(print)}")`,
-  ).join(" ");
+  return `\n  @owner(graph: "${serviceName}")` + keys[serviceName].map(
+    (key: FieldDefinitionNode[]) => `\n  @key(fields: "${key.map(print)}", graph: "${serviceName}")`,
+  ).join("");
 }
 
 function printInterface(type: GraphQLInterfaceType, options?: Options): string {
@@ -296,6 +266,7 @@ function printFields(
   options: Options | undefined,
   type: GraphQLObjectType | GraphQLInterfaceType,
 ) {
+
   const fields = Object.values(type.getFields()).map(
     (f, i) =>
       printDescription(options, f, '  ', !i) +
@@ -305,9 +276,14 @@ function printFields(
       ': ' +
       String(f.type) +
       printDeprecated(f) +
-      printFederationFieldDirectives(f),
+      printFederationFieldDirectives(f, type),
   );
-  return printBlock(fields);
+
+  // Federation change: for entities, we want to print the block on a new line.
+  // This is just a formatting nice-to-have.
+  const isEntity = Boolean(type.extensions?.federation?.keys);
+
+  return printBlock(fields, isEntity);
 }
 
 export function printWithReducedWhitespace(ast: ASTNode): string {
@@ -316,23 +292,53 @@ export function printWithReducedWhitespace(ast: ASTNode): string {
     .trim();
 }
 
-function printFederationFieldDirectives(field: GraphQLField<any, any>): string {
-  if (!field.extensions?.federation) return "";
+/**
+ * Federation change: print @resolve, @requires, and @provides directives
+ *
+ * @param field
+ * @param parentType
+ */
+function printFederationFieldDirectives(
+  field: GraphQLField<any, any>,
+  parentType: GraphQLObjectType | GraphQLInterfaceType,
+): string {
+  if (!field.extensions?.federation) return '';
 
-  let printed = "";
-  const { provides = [], requires = [] } = field.extensions.federation;
-  if (provides.length > 0) {
-    printed += ` @provides(fields: "${provides.map(printWithReducedWhitespace).join(" ")}")`;
+  const {
+    serviceName,
+    requires = [],
+    provides = [],
+  } = field.extensions.federation;
+
+  let printed = '';
+  // If a `serviceName` exists, we only want to print a `@resolve` directive
+  // if the `serviceName` differs from the `parentType`'s `serviceName`
+  if (
+    serviceName &&
+    serviceName !== parentType.extensions?.federation?.serviceName
+  ) {
+    printed += ` @resolve(graph: "${serviceName}")`;
   }
+
   if (requires.length > 0) {
-    printed += ` @requires(fields: "${requires.map(printWithReducedWhitespace).join(" ")}")`;
+    printed += ` @requires(fields: "${requires.map(printWithReducedWhitespace).join(' ')}")`;
+  }
+
+  if (provides.length > 0) {
+    printed += ` @provides(fields: "${provides.map(printWithReducedWhitespace).join(' ')}")`;
   }
 
   return printed;
 }
 
-function printBlock(items: string[]) {
-  return items.length !== 0 ? ' {\n' + items.join('\n') + '\n}' : '';
+// Federation change: `onNewLine` is a formatting nice-to-have for printing
+// types that have a list of directives attached, i.e. an entity.
+function printBlock(items: string[], onNewLine?: boolean) {
+  return items.length !== 0
+    ? onNewLine
+      ? '\n{\n' + items.join('\n') + '\n}'
+      : ' {\n' + items.join('\n') + '\n}'
+    : '';
 }
 
 function printArgs(

@@ -1,14 +1,15 @@
-import { fixtures } from '../../../../apollo-gateway/src/__tests__/__fixtures__/schemas';
-import { composeServices } from '../../composition';
-import { printComposedSdl } from '../printComposedSdl';
 import { lexicographicSortSchema } from 'graphql';
+import gql from 'graphql-tag';
+import { fixtures } from '../../../../apollo-gateway/src/__tests__/__fixtures__/schemas';
+import { composeAndValidate, ServiceDefinition } from '../../composition';
+import { printComposedSdl } from '../printComposedSdl';
 
 describe('printComposedSdl', () => {
-  let { schema } = composeServices(fixtures);
-  const sorted = lexicographicSortSchema(schema);
-
   it('prints a full, composed schema', () => {
-    expect(printComposedSdl(sorted, fixtures)).toMatchInlineSnapshot(`
+    let { schema, errors } = composeAndValidate(fixtures);
+    schema = lexicographicSortSchema(schema);
+    expect(errors).toHaveLength(0);
+    expect(printComposedSdl(schema, fixtures)).toMatchInlineSnapshot(`
       "schema
         @graph(name: \\"accounts\\", url: \\"https://api.accounts.com\\")
         @graph(name: \\"books\\", url: \\"https://api.books.com\\")
@@ -34,30 +35,36 @@ describe('printComposedSdl', () => {
 
       union Body = Image | Text
 
-      type Book implements Product @key(fields: \\"isbn\\") {
-        details: ProductDetailsBook
-        inStock: Boolean
+      type Book implements Product
+        @owner(graph: \\"books\\")
+        @key(fields: \\"isbn\\", graph: \\"books\\")
+      {
+        details: ProductDetailsBook @resolve(graph: \\"product\\")
+        inStock: Boolean @resolve(graph: \\"inventory\\")
         isbn: String!
-        isCheckedOut: Boolean
+        isCheckedOut: Boolean @resolve(graph: \\"inventory\\")
         metadata: [MetadataOrError]
-        name(delimeter: String = \\" \\"): String @requires(fields: \\"title year\\")
-        price: String
-        relatedReviews: [Review!]! @requires(fields: \\"similarBooks { isbn }\\")
-        reviews: [Review]
+        name(delimeter: String = \\" \\"): String @resolve(graph: \\"product\\") @requires(fields: \\"title year\\")
+        price: String @resolve(graph: \\"product\\")
+        relatedReviews: [Review!]! @resolve(graph: \\"reviews\\") @requires(fields: \\"similarBooks { isbn }\\")
+        reviews: [Review] @resolve(graph: \\"reviews\\")
         similarBooks: [Book]!
-        sku: String!
+        sku: String! @resolve(graph: \\"product\\")
         title: String
-        upc: String!
+        upc: String! @resolve(graph: \\"product\\")
         year: Int
       }
 
       union Brand = Amazon | Ikea
 
-      type Car implements Vehicle @key(fields: \\"id\\") {
+      type Car implements Vehicle
+        @owner(graph: \\"product\\")
+        @key(fields: \\"id\\", graph: \\"product\\")
+      {
         description: String
         id: String!
         price: String
-        retailPrice: String @requires(fields: \\"price\\")
+        retailPrice: String @resolve(graph: \\"reviews\\") @requires(fields: \\"price\\")
       }
 
       type Error {
@@ -65,15 +72,19 @@ describe('printComposedSdl', () => {
         message: String
       }
 
-      type Furniture implements Product @key(fields: \\"upc\\") @key(fields: \\"sku\\") {
+      type Furniture implements Product
+        @owner(graph: \\"product\\")
+        @key(fields: \\"upc\\", graph: \\"product\\")
+        @key(fields: \\"sku\\", graph: \\"product\\")
+      {
         brand: Brand
         details: ProductDetailsFurniture
-        inStock: Boolean
-        isHeavy: Boolean
+        inStock: Boolean @resolve(graph: \\"inventory\\")
+        isHeavy: Boolean @resolve(graph: \\"inventory\\")
         metadata: [MetadataOrError]
         name: String
         price: String
-        reviews: [Review]
+        reviews: [Review] @resolve(graph: \\"reviews\\")
         sku: String!
         upc: String!
       }
@@ -96,22 +107,28 @@ describe('printComposedSdl', () => {
         value: String!
       }
 
-      type Library @key(fields: \\"id\\") {
+      type Library
+        @owner(graph: \\"books\\")
+        @key(fields: \\"id\\", graph: \\"books\\")
+      {
         id: ID!
         name: String
-        userAccount(id: ID! = 1): User @requires(fields: \\"name\\")
+        userAccount(id: ID! = 1): User @resolve(graph: \\"accounts\\") @requires(fields: \\"name\\")
       }
 
       union MetadataOrError = Error | KeyValue
 
       type Mutation {
-        deleteReview(id: ID!): Boolean
-        login(password: String!, username: String!): User
-        reviewProduct(body: String!, upc: String!): Product
-        updateReview(review: UpdateReviewInput!): Review
+        deleteReview(id: ID!): Boolean @resolve(graph: \\"reviews\\")
+        login(password: String!, username: String!): User @resolve(graph: \\"accounts\\")
+        reviewProduct(body: String!, upc: String!): Product @resolve(graph: \\"reviews\\")
+        updateReview(review: UpdateReviewInput!): Review @resolve(graph: \\"reviews\\")
       }
 
-      type PasswordAccount @key(fields: \\"email\\") {
+      type PasswordAccount
+        @owner(graph: \\"accounts\\")
+        @key(fields: \\"email\\", graph: \\"accounts\\")
+      {
         email: String!
       }
 
@@ -140,18 +157,23 @@ describe('printComposedSdl', () => {
       }
 
       type Query {
-        body: Body!
-        book(isbn: String!): Book
-        books: [Book]
-        library(id: ID!): Library
-        product(upc: String!): Product
-        topCars(first: Int = 5): [Car]
-        topProducts(first: Int = 5): [Product]
-        topReviews(first: Int = 5): [Review]
-        vehicle(id: String!): Vehicle
+        body: Body! @resolve(graph: \\"documents\\")
+        book(isbn: String!): Book @resolve(graph: \\"books\\")
+        books: [Book] @resolve(graph: \\"books\\")
+        library(id: ID!): Library @resolve(graph: \\"books\\")
+        me: User @resolve(graph: \\"accounts\\")
+        product(upc: String!): Product @resolve(graph: \\"product\\")
+        topCars(first: Int = 5): [Car] @resolve(graph: \\"product\\")
+        topProducts(first: Int = 5): [Product] @resolve(graph: \\"product\\")
+        topReviews(first: Int = 5): [Review] @resolve(graph: \\"reviews\\")
+        user(id: ID!): User @resolve(graph: \\"accounts\\")
+        vehicle(id: String!): Vehicle @resolve(graph: \\"product\\")
       }
 
-      type Review @key(fields: \\"id\\") {
+      type Review
+        @owner(graph: \\"reviews\\")
+        @key(fields: \\"id\\", graph: \\"reviews\\")
+      {
         author: User @provides(fields: \\"username\\")
         body(format: Boolean = false): String
         id: ID!
@@ -159,7 +181,10 @@ describe('printComposedSdl', () => {
         product: Product
       }
 
-      type SMSAccount @key(fields: \\"number\\") {
+      type SMSAccount
+        @owner(graph: \\"accounts\\")
+        @key(fields: \\"number\\", graph: \\"accounts\\")
+      {
         number: String
       }
 
@@ -180,19 +205,22 @@ describe('printComposedSdl', () => {
         id: ID!
       }
 
-      type User @key(fields: \\"id\\") {
+      type User
+        @owner(graph: \\"accounts\\")
+        @key(fields: \\"id\\", graph: \\"accounts\\")
+      {
         account: AccountType
         birthDate(locale: String): String
-        goodAddress: Boolean @requires(fields: \\"metadata { address }\\")
-        goodDescription: Boolean @requires(fields: \\"metadata { description }\\")
+        goodAddress: Boolean @resolve(graph: \\"reviews\\") @requires(fields: \\"metadata { address }\\")
+        goodDescription: Boolean @resolve(graph: \\"inventory\\") @requires(fields: \\"metadata { description }\\")
         id: ID!
         metadata: [UserMetadata]
         name: String
-        numberOfReviews: Int!
-        reviews: [Review]
-        thing: Thing
+        numberOfReviews: Int! @resolve(graph: \\"reviews\\")
+        reviews: [Review] @resolve(graph: \\"reviews\\")
+        thing: Thing @resolve(graph: \\"product\\")
         username: String
-        vehicle: Vehicle
+        vehicle: Vehicle @resolve(graph: \\"product\\")
       }
 
       type UserMetadata {
@@ -201,11 +229,14 @@ describe('printComposedSdl', () => {
         name: String
       }
 
-      type Van implements Vehicle @key(fields: \\"id\\") {
+      type Van implements Vehicle
+        @owner(graph: \\"product\\")
+        @key(fields: \\"id\\", graph: \\"product\\")
+      {
         description: String
         id: String!
         price: String
-        retailPrice: String @requires(fields: \\"price\\")
+        retailPrice: String @resolve(graph: \\"reviews\\") @requires(fields: \\"price\\")
       }
 
       interface Vehicle {
@@ -213,6 +244,43 @@ describe('printComposedSdl', () => {
         id: String!
         price: String
         retailPrice: String
+      }
+      "
+    `);
+  });
+
+  it('fixes the block description bug', () => {
+    const serviceDefinitions: ServiceDefinition[] = [{
+      name: 'service',
+      url: 'https://service.api.com',
+      typeDefs: gql`
+        type Query {
+          """
+          Block description with "double quotes"
+          """
+          fieldWithBlockDescription: String
+        }
+      `,
+    }];
+
+    let { schema, errors } = composeAndValidate(serviceDefinitions);
+    schema = lexicographicSortSchema(schema);
+
+    expect(errors).toHaveLength(0);
+    expect(printComposedSdl(schema, serviceDefinitions))
+      .toMatchInlineSnapshot(`
+      "schema
+        @graph(name: \\"additional\\", url: \\"https://additional.api.com\\")
+        @composedGraph(version: 1)
+      {
+        query: Query
+      }
+
+      type Query {
+        \\"\\"\\"
+        Block description with \\"double quotes\\"
+        \\"\\"\\"
+        additional: String @resolve(graph: \\"additional\\")
       }
       "
     `);

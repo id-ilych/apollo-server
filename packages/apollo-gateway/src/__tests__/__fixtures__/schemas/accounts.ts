@@ -13,7 +13,6 @@ export const typeDefs = gql`
   }
 
   extend type RootQuery {
-    """Testing doc block"""
     user(id: ID!): User
     me: User
   }
