@@ -21,7 +21,7 @@ describe('printFederatedSchema', () => {
 
       union Body = Image | Text
 
-      type Book implements Product @key(fields: \\"isbn\\") @key(fields: \\"isbn\\") @key(fields: \\"isbn\\") @key(fields: \\"isbn\\") {
+      type Book implements Product @key(fields: \\"isbn\\") {
         details: ProductDetailsBook
         inStock: Boolean
         isbn: String!
@@ -40,7 +40,7 @@ describe('printFederatedSchema', () => {
 
       union Brand = Amazon | Ikea
 
-      type Car implements Vehicle @key(fields: \\"id\\") @key(fields: \\"id\\") {
+      type Car implements Vehicle @key(fields: \\"id\\") {
         description: String
         id: String!
         price: String
@@ -52,7 +52,7 @@ describe('printFederatedSchema', () => {
         message: String
       }
 
-      type Furniture implements Product @key(fields: \\"sku\\") @key(fields: \\"upc\\") @key(fields: \\"upc\\") @key(fields: \\"sku\\") {
+      type Furniture implements Product @key(fields: \\"upc\\") @key(fields: \\"sku\\") {
         brand: Brand
         details: ProductDetailsFurniture
         inStock: Boolean
@@ -83,7 +83,7 @@ describe('printFederatedSchema', () => {
         value: String!
       }
 
-      type Library @key(fields: \\"id\\") @key(fields: \\"id\\") {
+      type Library @key(fields: \\"id\\") {
         id: ID!
         name: String
         userAccount(id: ID! = 1): User @requires(fields: \\"name\\")
@@ -167,7 +167,7 @@ describe('printFederatedSchema', () => {
         id: ID!
       }
 
-      type User @key(fields: \\"id\\") @key(fields: \\"id\\") @key(fields: \\"id\\") @key(fields: \\"id\\") {
+      type User @key(fields: \\"id\\") {
         account: AccountType
         birthDate(locale: String): String
         goodAddress: Boolean @requires(fields: \\"metadata { address }\\")
@@ -188,7 +188,7 @@ describe('printFederatedSchema', () => {
         name: String
       }
 
-      type Van implements Vehicle @key(fields: \\"id\\") @key(fields: \\"id\\") {
+      type Van implements Vehicle @key(fields: \\"id\\") {
         description: String
         id: String!
         price: String

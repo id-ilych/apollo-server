@@ -1,89 +1,113 @@
-/*
- *
- * This is largely a fork of printSchema from graphql-js with added support for
- * federation directives. The default printSchema includes all directive
- * *definitions* but doesn't include any directive *usages*. This version strips
- * federation directive definitions (which will be the same in every federated
- * schema), but keeps all their usages (so the gateway can process them).
- *
- */
-
 import {
-  DEFAULT_DEPRECATION_REASON,
-  GraphQLArgument,
-  GraphQLDirective,
-  GraphQLEnumType,
-  GraphQLEnumValue,
-  GraphQLField,
-  GraphQLInputField,
-  GraphQLInputObjectType,
-  GraphQLInterfaceType,
-  GraphQLNamedType,
-  GraphQLObjectType,
-  GraphQLScalarType,
   GraphQLSchema,
-  GraphQLString,
-  GraphQLUnionType,
-  astFromValue,
+  isSpecifiedDirective,
+  isIntrospectionType,
+  isSpecifiedScalarType,
+  GraphQLNamedType,
+  GraphQLDirective,
+  isScalarType,
+  isObjectType,
+  isInterfaceType,
+  isUnionType,
   isEnumType,
   isInputObjectType,
-  isInterfaceType,
-  isIntrospectionType,
-  isObjectType,
-  isScalarType,
-  isSpecifiedScalarType,
-  isUnionType,
+  GraphQLScalarType,
+  GraphQLObjectType,
+  GraphQLInterfaceType,
+  GraphQLUnionType,
+  GraphQLEnumType,
+  GraphQLInputObjectType,
+  GraphQLArgument,
+  GraphQLInputField,
+  astFromValue,
   print,
-  specifiedDirectives,
+  GraphQLField,
+  GraphQLEnumValue,
+  GraphQLString,
+  DEFAULT_DEPRECATION_REASON,
+  FieldDefinitionNode,
+  ASTNode,
 } from 'graphql';
-import federationDirectives, { gatherDirectives } from '../directives';
+import { Maybe } from '../composition';
 import { isFederationType } from '../types';
+import { isFederationDirective } from '../composition/utils';
 
-// Federation change: treat the directives defined by the federation spec
-// similarly to the directives defined by the GraphQL spec (ie, don't print
-// their definitions).
-function isSpecifiedDirective(directive: GraphQLDirective): boolean {
-  return [...specifiedDirectives, ...federationDirectives].some(
-    specifiedDirective => specifiedDirective.name === directive.name,
+type Options = {
+  /**
+   * Descriptions are defined as preceding string literals, however an older
+   * experimental version of the SDL supported preceding comments as
+   * descriptions. Set to true to enable this deprecated behavior.
+   * This option is provided to ease adoption and will be removed in v16.
+   *
+   * Default: false
+   */
+  commentDescriptions?: boolean;
+};
+
+/**
+ * Accepts options as a second argument:
+ *
+ *    - commentDescriptions:
+ *        Provide true to use preceding comments as the description.
+ *
+ */
+export function printSchema(schema: GraphQLSchema, options?: Options): string {
+  return printFilteredSchema(
+    schema,
+    // Federation change: treat the directives defined by the federation spec
+    // similarly to the directives defined by the GraphQL spec (ie, don't print
+    // their definitions).
+    (n) => !isSpecifiedDirective(n) && !isFederationDirective(n),
+    isDefinedType,
+    options,
+  );
+}
+
+export function printIntrospectionSchema(
+  schema: GraphQLSchema,
+  options?: Options,
+): string {
+  return printFilteredSchema(
+    schema,
+    isSpecifiedDirective,
+    isIntrospectionType,
+    options,
   );
 }
 
 // Federation change: treat the types defined by the federation spec
 // similarly to the directives defined by the GraphQL spec (ie, don't print
 // their definitions).
-function isDefinedType(type: GraphQLNamedType | GraphQLScalarType): boolean {
+function isDefinedType(type: GraphQLNamedType): boolean {
   return (
-    !isSpecifiedScalarType(type as GraphQLScalarType) &&
+    !isSpecifiedScalarType(type) &&
     !isIntrospectionType(type) &&
     !isFederationType(type)
   );
 }
 
-export function printSchema(schema: GraphQLSchema): string {
-  const directives = schema
-    .getDirectives()
-    .filter(n => !isSpecifiedDirective(n));
-  const typeMap = schema.getTypeMap();
-  const types = Object.values(typeMap)
-    .sort((type1, type2) => type1.name.localeCompare(type2.name))
-    .filter(isDefinedType);
+function printFilteredSchema(
+  schema: GraphQLSchema,
+  directiveFilter: (type: GraphQLDirective) => boolean,
+  typeFilter: (type: GraphQLNamedType) => boolean,
+  options?: Options,
+): string {
+  const directives = schema.getDirectives().filter(directiveFilter);
+  const types = Object.values(schema.getTypeMap()).filter(typeFilter);
 
   return (
     [printSchemaDefinition(schema)]
       .concat(
-        directives.map(directive => printDirective(directive)),
-        types.map(type => printType(type)),
+        directives.map((directive) => printDirective(directive, options)),
+        types.map((type) => printType(type, options)),
       )
       .filter(Boolean)
       .join('\n\n') + '\n'
   );
 }
 
-/*
- * below is directly copied from graphql-js with some minor modifications
- */
 function printSchemaDefinition(schema: GraphQLSchema): string | undefined {
-  if (isSchemaOfCommonNames(schema)) {
+  if (schema.description == null && isSchemaOfCommonNames(schema)) {
     return;
   }
 
@@ -104,7 +128,9 @@ function printSchemaDefinition(schema: GraphQLSchema): string | undefined {
     operationTypes.push(`  subscription: ${subscriptionType.name}`);
   }
 
-  return `schema {\n${operationTypes.join('\n')}\n}`;
+  return (
+    printDescription({}, schema) + `schema {\n${operationTypes.join('\n')}\n}`
+  );
 }
 
 /**
@@ -138,142 +164,169 @@ function isSchemaOfCommonNames(schema: GraphQLSchema): boolean {
   return true;
 }
 
-function printType(type: GraphQLNamedType): string {
+export function printType(type: GraphQLNamedType, options?: Options): string {
   if (isScalarType(type)) {
-    return printScalar(type);
-  } else if (isObjectType(type)) {
-    return printObject(type);
-  } else if (isInterfaceType(type)) {
-    return printInterface(type);
-  } else if (isUnionType(type)) {
-    return printUnion(type);
-  } else if (isEnumType(type)) {
-    return printEnum(type);
-  } else if (isInputObjectType(type)) {
-    return printInputObject(type);
+    return printScalar(type, options);
+  }
+  if (isObjectType(type)) {
+    return printObject(type, options);
+  }
+  if (isInterfaceType(type)) {
+    return printInterface(type, options);
+  }
+  if (isUnionType(type)) {
+    return printUnion(type, options);
+  }
+  if (isEnumType(type)) {
+    return printEnum(type, options);
+  }
+  // istanbul ignore else (See: 'https://github.com/graphql/graphql-js/issues/2618')
+  if (isInputObjectType(type)) {
+    return printInputObject(type, options);
   }
 
-  // Not reachable. All possible types have been considered.
-  /* istanbul ignore next */
-  throw new Error(`Unexpected type: "${type}".`);
+  throw Error('Unexpected type: ' + (type as GraphQLNamedType).toString());
 }
 
-function printScalar(type: GraphQLScalarType): string {
-  return printDescription(type) + `scalar ${type.name}`;
+function printScalar(type: GraphQLScalarType, options?: Options): string {
+  return (
+    printDescription(options, type) +
+    `scalar ${type.name}` +
+    printSpecifiedByUrl(type)
+  );
 }
 
-// Federation change: *do* print the usages of federation directives.
-function printFederationDirectives(
-  type: GraphQLNamedType | GraphQLField<any, any>,
+function printImplementedInterfaces(
+  type: GraphQLObjectType | GraphQLInterfaceType,
 ): string {
-  if (!type.astNode) return '';
-  if (isInputObjectType(type)) return '';
-  const directives = gatherDirectives(type)
-    .filter(n =>
-      federationDirectives.some(fedDir => fedDir.name === n.name.value),
-    )
-    .map(print)
-    .join(' ');
-
-  return directives.length > 0 ? ' ' + directives : '';
-}
-
-function printObject(type: GraphQLObjectType): string {
   const interfaces = type.getInterfaces();
-  // Federation change: print `extend` keyword on type extensions.
-  //
-  // The implementation assumes that an owned type will have fields defined
-  // since that is required for a valid schema. Types that are *only*
-  // extensions will not have fields on the astNode since that ast doesn't
-  // exist.
-  //
-  // XXX revist extension checking
-  const isExtension =
-    type.extensionASTNodes && type.astNode && !type.astNode.fields;
-  const implementedInterfaces = interfaces.length
-    ? ' implements ' + interfaces.map(i => i.name).join(' & ')
+  return interfaces.length
+    ? ' implements ' + interfaces.map((i) => i.name).join(' & ')
     : '';
+}
+
+function printObject(type: GraphQLObjectType, options?: Options): string {
   return (
-    printDescription(type) +
-    `${isExtension ? 'extend ' : ''}type ${
-      type.name
-    }${implementedInterfaces}${printFederationDirectives(type)}` +
-    printFields(type)
+    printDescription(options, type) +
+    `type ${type.name}` +
+    printImplementedInterfaces(type) +
+    // Federation addition for printing @key usages
+    printKeyDirectives(type) +
+    printFields(options, type)
   );
 }
 
-function printInterface(type: GraphQLInterfaceType): string {
-  // Federation change: print `extend` keyword on type extensions.
-  // See printObject for assumptions made.
-  //
-  // XXX revist extension checking
-  const isExtension =
-    type.extensionASTNodes && type.astNode && !type.astNode.fields;
+// Federation change: print usages of the @key directive.
+function printKeyDirectives(type: GraphQLObjectType): string {
+  const metadata = type.extensions?.federation;
+  if (!metadata) return '';
+
+  const { serviceName, keys } = metadata;
+  if (!keys) return '';
+
+  return " " + keys[serviceName].map(
+    (key: FieldDefinitionNode[]) => `@key(fields: "${key.map(print)}")`,
+  ).join(" ");
+}
+
+function printInterface(type: GraphQLInterfaceType, options?: Options): string {
   return (
-    printDescription(type) +
-    `${isExtension ? 'extend ' : ''}interface ${
-      type.name
-    }${printFederationDirectives(type)}` +
-    printFields(type)
+    printDescription(options, type) +
+    `interface ${type.name}` +
+    printImplementedInterfaces(type) +
+    printFields(options, type)
   );
 }
 
-function printUnion(type: GraphQLUnionType): string {
+function printUnion(type: GraphQLUnionType, options?: Options): string {
   const types = type.getTypes();
   const possibleTypes = types.length ? ' = ' + types.join(' | ') : '';
-  return printDescription(type) + 'union ' + type.name + possibleTypes;
+  return printDescription(options, type) + 'union ' + type.name + possibleTypes;
 }
 
-function printEnum(type: GraphQLEnumType): string {
+function printEnum(type: GraphQLEnumType, options?: Options): string {
   const values = type
     .getValues()
     .map(
-      value =>
-        printDescription(value, '  ') +
+      (value, i) =>
+        printDescription(options, value, '  ', !i) +
         '  ' +
         value.name +
         printDeprecated(value),
     );
 
-  return printDescription(type) + `enum ${type.name}` + printBlock(values);
+  return (
+    printDescription(options, type) + `enum ${type.name}` + printBlock(values)
+  );
 }
 
-function printInputObject(type: GraphQLInputObjectType): string {
+function printInputObject(
+  type: GraphQLInputObjectType,
+  options?: Options,
+): string {
   const fields = Object.values(type.getFields()).map(
-    f => printDescription(f, '  ') + '  ' + printInputValue(f),
+    (f, i) =>
+      printDescription(options, f, '  ', !i) + '  ' + printInputValue(f),
   );
-  return printDescription(type) + `input ${type.name}` + printBlock(fields);
+  return (
+    printDescription(options, type) + `input ${type.name}` + printBlock(fields)
+  );
 }
 
 function printFields(
-  type: GraphQLInterfaceType | GraphQLObjectType | GraphQLInputObjectType,
+  options: Options | undefined,
+  type: GraphQLObjectType | GraphQLInterfaceType,
 ) {
   const fields = Object.values(type.getFields()).map(
-    f =>
-      printDescription(f, '  ') +
+    (f, i) =>
+      printDescription(options, f, '  ', !i) +
       '  ' +
       f.name +
-      printArgs(f.args, '  ') +
+      printArgs(options, f.args, '  ') +
       ': ' +
       String(f.type) +
       printDeprecated(f) +
-      // Federation change: print usages of federation directives.
-      printFederationDirectives(f),
+      printFederationFieldDirectives(f),
   );
   return printBlock(fields);
+}
+
+export function printWithReducedWhitespace(ast: ASTNode): string {
+  return print(ast)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function printFederationFieldDirectives(field: GraphQLField<any, any>): string {
+  if (!field.extensions?.federation) return "";
+
+  let printed = "";
+  const { provides = [], requires = [] } = field.extensions.federation;
+  if (provides.length > 0) {
+    printed += ` @provides(fields: "${provides.map(printWithReducedWhitespace).join(" ")}")`;
+  }
+  if (requires.length > 0) {
+    printed += ` @requires(fields: "${requires.map(printWithReducedWhitespace).join(" ")}")`;
+  }
+
+  return printed;
 }
 
 function printBlock(items: string[]) {
   return items.length !== 0 ? ' {\n' + items.join('\n') + '\n}' : '';
 }
 
-function printArgs(args: GraphQLArgument[], indentation = '') {
+function printArgs(
+  options: Options | undefined,
+  args: GraphQLArgument[],
+  indentation = '',
+) {
   if (args.length === 0) {
     return '';
   }
 
   // If every arg does not have a description, print them on one line.
-  if (args.every(arg => !arg.description)) {
+  if (args.every((arg) => !arg.description)) {
     return '(' + args.map(printInputValue).join(', ') + ')';
   }
 
@@ -281,8 +334,8 @@ function printArgs(args: GraphQLArgument[], indentation = '') {
     '(\n' +
     args
       .map(
-        arg =>
-          printDescription(arg, '  ' + indentation) +
+        (arg, i) =>
+          printDescription(options, arg, '  ' + indentation, !i) +
           '  ' +
           indentation +
           printInputValue(arg),
@@ -294,7 +347,7 @@ function printArgs(args: GraphQLArgument[], indentation = '') {
   );
 }
 
-function printInputValue(arg: GraphQLInputField | GraphQLArgument) {
+function printInputValue(arg: GraphQLInputField) {
   const defaultAST = astFromValue(arg.defaultValue, arg.type);
   let argDecl = arg.name + ': ' + String(arg.type);
   if (defaultAST) {
@@ -303,12 +356,13 @@ function printInputValue(arg: GraphQLInputField | GraphQLArgument) {
   return argDecl;
 }
 
-function printDirective(directive: GraphQLDirective) {
+function printDirective(directive: GraphQLDirective, options?: Options) {
   return (
-    printDescription(directive) +
+    printDescription(options, directive) +
     'directive @' +
     directive.name +
-    printArgs(directive.args) +
+    printArgs(options, directive.args) +
+    (directive.isRepeatable ? ' repeatable' : '') +
     ' on ' +
     directive.locations.join(' | ')
   );
@@ -322,60 +376,96 @@ function printDeprecated(
   }
   const reason = fieldOrEnumVal.deprecationReason;
   const reasonAST = astFromValue(reason, GraphQLString);
-  if (reasonAST && reason !== '' && reason !== DEFAULT_DEPRECATION_REASON) {
+  if (reasonAST && reason !== DEFAULT_DEPRECATION_REASON) {
     return ' @deprecated(reason: ' + print(reasonAST) + ')';
   }
   return ' @deprecated';
 }
 
-function printDescription(
-  def:
-    | GraphQLArgument
-    | GraphQLDirective
-    | GraphQLEnumType
-    | GraphQLField<any, any>
-    | GraphQLInputField
-    | GraphQLInputObjectType
-    | GraphQLInterfaceType
-    | GraphQLNamedType
-    | GraphQLEnumValue
-    | GraphQLUnionType,
-  indentation: string = '',
+function printSpecifiedByUrl(scalar: GraphQLScalarType) {
+  if (scalar.specifiedByUrl == null) {
+    return '';
+  }
+  const url = scalar.specifiedByUrl;
+  const urlAST = astFromValue(url, GraphQLString);
+
+  if (!urlAST) {
+    throw new Error(
+      'Unexpected null value returned from `astFromValue` for specifiedByUrl',
+    );
+  }
+
+  return ' @specifiedBy(url: ' + print(urlAST) + ')';
+}
+
+function printDescription<T extends { description?: Maybe<string> }>(
+  options: Options | undefined,
+  def: T,
+  indentation = '',
+  firstInBlock = true,
 ): string {
-  if (def.description == null) {
+  const { description } = def;
+  if (description == null) {
     return '';
   }
 
-  const lines = descriptionLines(def.description, 120 - indentation.length);
-  if (lines.length === 1) {
-    return indentation + `"${lines[0]}"\n`;
-  } else {
-    return (
-      indentation + ['"""', ...lines, '"""'].join('\n' + indentation) + '\n'
-    );
+  if (options?.commentDescriptions === true) {
+    return printDescriptionWithComments(description, indentation, firstInBlock);
   }
+
+  const preferMultipleLines = description.length > 70;
+  const blockString = printBlockString(description, '', preferMultipleLines);
+  const prefix =
+    indentation && !firstInBlock ? '\n' + indentation : indentation;
+
+  return prefix + blockString.replace(/\n/g, '\n' + indentation) + '\n';
 }
 
-function descriptionLines(description: string, maxLen: number): Array<string> {
-  const rawLines = description.split('\n');
-  return rawLines.flatMap(line => {
-    if (line.length < maxLen + 5) {
-      return line;
-    }
-    // For > 120 character long lines, cut at space boundaries into sublines
-    // of ~80 chars.
-    return breakLine(line, maxLen);
-  });
+function printDescriptionWithComments(
+  description: string,
+  indentation: string,
+  firstInBlock: boolean,
+) {
+  const prefix = indentation && !firstInBlock ? '\n' : '';
+  const comment = description
+    .split('\n')
+    .map((line) => indentation + (line !== '' ? '# ' + line : '#'))
+    .join('\n');
+
+  return prefix + comment + '\n';
 }
 
-function breakLine(line: string, maxLen: number): Array<string> {
-  const parts = line.split(new RegExp(`((?: |^).{15,${maxLen - 40}}(?= |$))`));
-  if (parts.length < 4) {
-    return [line];
+/**
+ * Print a block string in the indented block form by adding a leading and
+ * trailing blank line. However, if a block string starts with whitespace and is
+ * a single-line, adding a leading blank line would strip that whitespace.
+ *
+ * @internal
+ */
+export function printBlockString(
+  value: string,
+  indentation: string = '',
+  preferMultipleLines: boolean = false,
+): string {
+  const isSingleLine = value.indexOf('\n') === -1;
+  const hasLeadingSpace = value[0] === ' ' || value[0] === '\t';
+  const hasTrailingQuote = value[value.length - 1] === '"';
+  const hasTrailingSlash = value[value.length - 1] === '\\';
+  const printAsMultipleLines =
+    !isSingleLine ||
+    hasTrailingQuote ||
+    hasTrailingSlash ||
+    preferMultipleLines;
+
+  let result = '';
+  // Format a multi-line block quote to account for leading space.
+  if (printAsMultipleLines && !(isSingleLine && hasLeadingSpace)) {
+    result += '\n' + indentation;
   }
-  const sublines = [parts[0] + parts[1] + parts[2]];
-  for (let i = 3; i < parts.length; i += 2) {
-    sublines.push(parts[i].slice(1) + parts[i + 1]);
+  result += indentation ? value.replace(/\n/g, '\n' + indentation) : value;
+  if (printAsMultipleLines) {
+    result += '\n';
   }
-  return sublines;
+
+  return '"""' + result.replace(/"""/g, '\\"""') + '"""';
 }
