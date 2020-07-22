@@ -107,7 +107,12 @@ function printFilteredSchema(
 }
 
 function printSchemaDefinition(schema: GraphQLSchema): string | undefined {
-  if (schema.description == null && isSchemaOfCommonNames(schema)) {
+  if (
+    // Federation change: `schema.description` isn't supported in graphql@^14.
+    // This change follows the former implementation as it was in `graphql@14.7.0`
+    // schema.description == null &&
+    isSchemaOfCommonNames(schema)
+  ) {
     return;
   }
 
@@ -129,7 +134,9 @@ function printSchemaDefinition(schema: GraphQLSchema): string | undefined {
   }
 
   return (
-    printDescription({}, schema) + `schema {\n${operationTypes.join('\n')}\n}`
+    // Federation change: graphql@14 doesn't support schema descriptions
+    // printDescription({}, schema) +
+    `schema {\n${operationTypes.join('\n')}\n}`
   );
 }
 
@@ -197,7 +204,10 @@ function printScalar(type: GraphQLScalarType, options?: Options): string {
 }
 
 function printImplementedInterfaces(
-  type: GraphQLObjectType | GraphQLInterfaceType,
+  type: GraphQLObjectType
+  // Federation change: interfaces implementing interfaces isn't supported in
+  // graphql@^14. This change follows the former implementation as it was in `graphql@14.7.0`
+  // | GraphQLInterfaceType,
 ): string {
   const interfaces = type.getInterfaces();
   return interfaces.length
@@ -233,7 +243,8 @@ function printInterface(type: GraphQLInterfaceType, options?: Options): string {
   return (
     printDescription(options, type) +
     `interface ${type.name}` +
-    printImplementedInterfaces(type) +
+    // Federation change: graphql@14 doesn't support interfaces implementing interfaces
+    // printImplementedInterfaces(type) +
     printFields(options, type)
   );
 }
@@ -383,10 +394,17 @@ function printDeprecated(
 }
 
 function printSpecifiedByUrl(scalar: GraphQLScalarType) {
-  if (scalar.specifiedByUrl == null) {
+  // Federation change: `scalar.specifiedByUrl` isn't supported in graphql@^14.
+  // This change merely works around TypeScript for now until we move to v15.
+  if ((scalar as any).specifiedByUrl == null) {
     return '';
   }
-  const url = scalar.specifiedByUrl;
+  const url = (scalar as any).specifiedByUrl;
+
+  // if (scalar.specifiedByUrl == null) {
+  //   return '';
+  // }
+  // const url = scalar.specifiedByUrl;
   const urlAST = astFromValue(url, GraphQLString);
 
   if (!urlAST) {
