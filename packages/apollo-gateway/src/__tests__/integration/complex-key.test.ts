@@ -44,7 +44,7 @@ const reviewService: ServiceDefinitionModule = {
       organization: Organization! @external
     }
 
-    extend type Organization {
+    extend type Organization @key(fields: "id") {
       id: ID! @external
     }
   `,

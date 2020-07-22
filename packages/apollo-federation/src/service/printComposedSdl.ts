@@ -199,8 +199,20 @@ function printImplementedInterfaces(
 }
 
 function printObject(type: GraphQLObjectType, options?: Options): string {
+  // Federation change: print `extend` keyword on type extensions.
+  //
+  // The implementation assumes that an owned type will have fields defined
+  // since that is required for a valid schema. Types that are *only*
+  // extensions will not have fields on the astNode since that ast doesn't
+  // exist.
+  //
+  // XXX revist extension checking
+  const isExtension =
+    type.extensionASTNodes && type.astNode && !type.astNode.fields;
+
   return (
     printDescription(options, type) +
+    (isExtension ? 'extend ' : '') +
     `type ${type.name}` +
     printImplementedInterfaces(type) +
     // Federation addition for printing @owner and @key usages
@@ -223,8 +235,16 @@ function printEntityDirectives(type: GraphQLObjectType): string {
 }
 
 function printInterface(type: GraphQLInterfaceType, options?: Options): string {
+  // Federation change: print `extend` keyword on type extensions.
+  // See printObject for assumptions made.
+  //
+  // XXX revist extension checking
+  const isExtension =
+    type.extensionASTNodes && type.astNode && !type.astNode.fields;
+
   return (
     printDescription(options, type) +
+    (isExtension ? 'extend ' : '') +
     `interface ${type.name}` +
     // Federation change: graphql@14 doesn't support interfaces implementing interfaces
     // printImplementedInterfaces(type) +
