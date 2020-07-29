@@ -578,12 +578,12 @@ function splitFields(
         );
 
         // With no extending field definitions, we can engage the optimization
+        let interfaceGroup: FetchGroup | null = null;
         if (hasNoExtendingFieldDefs) {
-          const group = groupForField(field as Field<GraphQLObjectType>);
-          group.fields.push(
-            completeField(context, scope, group, path, fieldsForResponseName)
+          interfaceGroup = groupForField(field as Field<GraphQLObjectType>);
+          interfaceGroup.fields.push(
+            completeField(context, scope, interfaceGroup, path, fieldsForResponseName)
           );
-          continue;
         }
 
         // We keep track of which possible runtime parent types can be fetched
@@ -594,6 +594,30 @@ function splitFields(
         >();
 
         for (const runtimeParentType of scope.possibleTypes) {
+          // If we already added interface group
+          // we can skip types that are already covered by that case
+          if (interfaceGroup) {
+            const possibleTypeFederationMetadata = getFederationMetadata(runtimeParentType);
+            // If type has no federation metadata it means that either:
+            // 1. type is on the same service as the interface group and thus already covered
+            // 2. type is local to the other service - it can't be fetched any way
+            // In both cases we can safely skip it. Same goes for value types
+            if (possibleTypeFederationMetadata === undefined || possibleTypeFederationMetadata.isValueType) {
+              continue;
+            }
+
+            const fieldDef = context.getFieldDef(runtimeParentType, field.fieldNode);
+            const fieldFederationMetadata = getFederationMetadata(fieldDef);
+            // If the field has no federation data then then interface could have only
+            // be stated at the base service for the runtimeParentType thus
+            // if it is owned by the same service as the interface group - we can skip it.
+            if (!fieldFederationMetadata && possibleTypeFederationMetadata.serviceName === interfaceGroup.serviceName) {
+              continue;
+            }
+
+            // Otherwise we have to add a case for the possible type to fetch the field from other service
+          }
+
           const fieldDef = context.getFieldDef(
             runtimeParentType,
             field.fieldNode,
